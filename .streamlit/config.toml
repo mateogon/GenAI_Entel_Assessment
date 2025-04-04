@@ -1,0 +1,19 @@
+[theme]
+# Entel-like colors (adjust as needed)
+primaryColor="#005EB8" # A shade of blue often associated with Entel
+backgroundColor="#F0F2F6" # Light gray background
+secondaryBackgroundColor="#FFFFFF" # White for containers/widgets background
+textColor="#1E1E1E" # Dark gray/black for text
+font="sans serif" # Standard sans-serif font
+
+[server]
+# Optional: If running locally and want to avoid browser opening automatically
+# headles=s = true
+
+[client]
+# Optional: Could disable toolbar elements if desired
+# showErrorDetails = false
+# toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false # Optional: Disable sending usage stats to Streamlit
