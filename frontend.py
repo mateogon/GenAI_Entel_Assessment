@@ -115,7 +115,7 @@ try:
     if status_res.status_code == 200:
         status_data = status_res.json()
         status_placeholder.success(f"API Conectada ({API_BASE_URL})")
-        st.sidebar.metric("Transcripciones Cargadas", status_data.get("transcripts_loaded", "N/A"))
+        st.sidebar.metric("Puntos Indexados (Qdrant)", status_data.get("collection_points_count", "N/A"))
     else:
         status_placeholder.error(f"API No Responde ({status_res.status_code})")
 except requests.exceptions.ConnectionError:
@@ -213,7 +213,7 @@ with st.container():  # Agrupa los elementos
     if analysis_option == "ID de Transcripción":
         transcript_id_input = st.text_input(
             "ID de la Transcripción:",
-            placeholder="Ej: 01, 31, sample_45, ... (Obtenido de la búsqueda)",
+            placeholder="Ej: sample_01, sample_31, sample_45, ... (Obtenido de la búsqueda)",
             key="transcript_id_input"
         )
     # Área de texto para pegar la transcripción

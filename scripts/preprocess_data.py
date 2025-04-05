@@ -1,6 +1,7 @@
 import re
 import os
 import sys
+import concurrent.futures
 from typing import List, Dict, Any, Optional
 
 # --- Añadir Directorio Raíz al Path ---
@@ -73,15 +74,12 @@ if PRESIDIO_INSTALLED:
             score=0.75  # Puntuación ligeramente menor para diferenciar
         )   
         # --- Reconocedor de Números Telefónicos (formato chileno) ---
-        # Agregar un reconocedor personalizado para formatos telefónicos chilenos
         phone_pattern = Pattern(
             name="chile_phone_pattern",
             # Coincide con +56XXXXXXXXX, +56 9 XXXX XXXX y otros formatos comunes chilenos
             regex=r"\b(\+?56\s?[2-9][\s\d]{8,11})\b",
             score=0.7  # Puntuación adecuada para asegurar detección
         )
-
-        # Crear el reconocedor de teléfono
         phone_recognizer = PatternRecognizer(
             supported_entity="PHONE_NUMBER",  # Tipo de entidad estándar para compatibilidad
             name="ChileanPhoneRecognizer",
@@ -91,14 +89,11 @@ if PRESIDIO_INSTALLED:
         )
 
         # --- Reconocedor de Email (mejorado) ---
-        # Agregar un reconocedor de email personalizado con mayor puntuación para asegurar la detección
         email_pattern = Pattern(
             name="email_pattern",
             regex=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
             score=0.9  # Puntuación más alta para priorizar la detección
         )
-
-        # Crear el reconocedor de email
         email_recognizer = PatternRecognizer(
             supported_entity="EMAIL_ADDRESS",  # Tipo de entidad estándar para compatibilidad
             name="EmailRecognizer",
@@ -107,15 +102,15 @@ if PRESIDIO_INSTALLED:
             supported_language="es"
         )
 
-
-        # Crear el reconocedor usando los patrones, asignándole explícitamente el idioma "es"
+        # Crear el reconocedor de RUT usando los patrones
         rut_recognizer = PatternRecognizer(
-        supported_entity="CL_RUT",
-        name="ChileanRUTRecognizer",
-        patterns=[rut_pattern_standard, rut_pattern_dashes, rut_pattern_spaces],  # Lista de patrones
-        context=["RUT", "rut", "Rol Único Tributario"],
-        supported_language="es"
-    )
+            supported_entity="CL_RUT",
+            name="ChileanRUTRecognizer",
+            patterns=[rut_pattern_standard, rut_pattern_dashes, rut_pattern_spaces],
+            context=["RUT", "rut", "Rol Único Tributario"],
+            supported_language="es"
+        )
+
         # Añadir todos los reconocedores personalizados al registro
         analyzer.registry.add_recognizer(rut_recognizer)
         analyzer.registry.add_recognizer(phone_recognizer)
@@ -135,7 +130,6 @@ if PRESIDIO_INSTALLED:
 else:
     print("Presidio no está instalado. La anonimización será omitida.")
 
-
 # --- Regex para Limpieza ---
 FILLER_WORDS_ES = re.compile(
     r'\b(eh|este|pues|bueno|o sea|¿sabes\?|¿no\?|¿vale\?|¿entiendes\?|um|uh|hmm|como)\b',
@@ -146,12 +140,11 @@ LEADING_TRAILING_SPACES = re.compile(r'^\s+|\s+$')
 MARKDOWN_BOLD = re.compile(r'\*\*(.*?)\*\*')  # Regex para quitar ** de markdown
 
 # --- Funciones de Procesamiento ---
-
 def clean_text(text: str) -> str:
     """Realiza limpieza básica del texto, incluyendo markdown simple."""
     if not isinstance(text, str):
         return ""
-    # Quitar markdown bold (**text**) -> text
+    # Quitar markdown bold (**texto**) -> texto
     cleaned = MARKDOWN_BOLD.sub(r'\1', text)
     # Limpieza general
     cleaned = LEADING_TRAILING_SPACES.sub('', cleaned)
@@ -166,11 +159,9 @@ def anonymize_text(text: str) -> str:
         return text
 
     try:
-        # Analizar buscando entidades comunes + CL_RUT
         analyzer_results = analyzer.analyze(
             text=text,
             language="es",
-            # Lista de entidades a buscar (incluyendo la personalizada)
             entities=[
                 "PERSON", "LOCATION", "PHONE_NUMBER", "EMAIL_ADDRESS",
                 "URL", "DATE_TIME", "CREDIT_CARD", "IBAN_CODE", "NRP", "CL_RUT"
@@ -178,34 +169,30 @@ def anonymize_text(text: str) -> str:
             allow_list=None,
         )
 
-        # Si no se encontraron PII, devolver el texto tal cual
         if not analyzer_results:
             return text
 
-        # Configurar cómo reemplazar cada tipo de PII encontrado
         anonymized_results = anonymizer.anonymize(
-        text=text,
-        analyzer_results=analyzer_results,
-        operators={
-            "PERSON": OperatorConfig("replace", {"new_value": "<PERSONA>"}),
-            "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "<TELEFONO>"}),  # Cambiado a reemplazo en lugar de enmascaramiento
-            "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "<EMAIL>"}),    # Cambiado a reemplazo en lugar de enmascaramiento
-            "LOCATION": OperatorConfig("replace", {"new_value": "<LUGAR>"}),
-            "URL": OperatorConfig("replace", {"new_value": "<URL>"}),
-            "DATE_TIME": OperatorConfig("replace", {"new_value": "<FECHA_HORA>"}),
-            "CREDIT_CARD": OperatorConfig("mask", {"type": "mask", "masking_char": "*", "chars_to_mask": 16, "from_end": False}),
-            "IBAN_CODE": OperatorConfig("mask", {"type": "mask", "masking_char": "*", "chars_to_mask": 16, "from_end": False}),
-            "NRP": OperatorConfig("replace", {"new_value": "<ID_NUMERICO>"}),
-            "CL_RUT": OperatorConfig("replace", {"new_value": "<RUT>"}),
-            "DEFAULT": OperatorConfig("replace", {"new_value": "<PII>"})
-        }
-    )
+            text=text,
+            analyzer_results=analyzer_results,
+            operators={
+                "PERSON": OperatorConfig("replace", {"new_value": "<PERSONA>"}),
+                "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "<TELEFONO>"}),
+                "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "<EMAIL>"}),
+                "LOCATION": OperatorConfig("replace", {"new_value": "<LUGAR>"}),
+                "URL": OperatorConfig("replace", {"new_value": "<URL>"}),
+                "DATE_TIME": OperatorConfig("replace", {"new_value": "<FECHA_HORA>"}),
+                "CREDIT_CARD": OperatorConfig("mask", {"type": "mask", "masking_char": "*", "chars_to_mask": 16, "from_end": False}),
+                "IBAN_CODE": OperatorConfig("mask", {"type": "mask", "masking_char": "*", "chars_to_mask": 16, "from_end": False}),
+                "NRP": OperatorConfig("replace", {"new_value": "<ID_NUMERICO>"}),
+                "CL_RUT": OperatorConfig("replace", {"new_value": "<RUT>"}),
+                "DEFAULT": OperatorConfig("replace", {"new_value": "<PII>"})
+            }
+        )
         return anonymized_results.text
 
     except ValueError as ve:
-        # Manejar específicamente el error "No matching recognizers" como advertencia silenciosa
         if "No matching recognizers" in str(ve):
-            # Devolver texto original si no encontró nada
             return text
         else:
             print(f"Error ValueError en Presidio procesando texto: '{text[:50]}...'. Error: {ve}")
@@ -220,84 +207,79 @@ def preprocess_single_transcript(transcript_item: Dict[str, Any]) -> Optional[Di
     transcript_id = transcript_item.get("id", "ID_DESCONOCIDO")
     original_utterances = transcript_item.get('data', [])
 
-    # Validar que los datos parseados sean una lista
     if not isinstance(original_utterances, list):
          print(f"Advertencia: Formato de datos parseados inválido para ID {transcript_id}. Se esperaba lista. Saltando transcripción.")
-         return None  # Indica que esta transcripción no se pudo procesar
+         return None
 
-    # Iterar sobre cada línea/turno parseado
     for utterance in original_utterances:
         speaker = utterance.get('speaker', 'DESCONOCIDO')
         timestamp = utterance.get('timestamp', 'N/A')
         original_text = utterance.get('text', '')
 
-        # Preparar el preview del texto original (independiente del procesamiento)
         original_preview = original_text[:70] + ("..." if len(original_text) > 70 else "")
 
-        # Decidir si el texto de este turno necesita limpieza y anonimización
-        # Ignorar hablantes de sistema/nota o texto vacío
         if speaker in ["SISTEMA", "NOTA", "DESCONOCIDO"] or not original_text.strip():
-             processed_text = ""  # Dejar vacío el texto procesado para estos casos
+             processed_text = ""
         else:
-            # Aplicar limpieza primero
             cleaned_text = clean_text(original_text)
-            # Luego anonimizar el texto ya limpio
             processed_text = anonymize_text(cleaned_text)
 
-        # Construir el diccionario para este turno procesado
         processed_utterance = {
             "speaker": speaker,
             "timestamp": timestamp,
-            "original_text_preview": original_preview,  # Guardar preview del *original*
-            "processed_text": processed_text            # Texto final limpio y anonimizado
+            "original_text_preview": original_preview,
+            "processed_text": processed_text
         }
         processed_utterances.append(processed_utterance)
 
-    # Devolver la estructura completa de la transcripción procesada
     return {"id": transcript_id, "processed_data": processed_utterances}
+
+# --- Función para Procesar y Guardar cada Transcripción ---
+def process_and_save_transcript(transcript_item: Dict[str, Any], index: int) -> bool:
+    transcript_id = transcript_item.get("id", f"desconocido_{index}")
+    print(f"Procesando transcripción {index+1} (ID: {transcript_id})...")
+    processed_transcript_data = preprocess_single_transcript(transcript_item)
+    if processed_transcript_data:
+        save_processed_transcript(processed_transcript_data)
+        return True
+    else:
+        print(f"Error procesando transcripción ID: {transcript_id}. Omitida.")
+        return False
 
 # --- Función Principal ---
 def main():
-    """Función principal para ejecutar el preprocesamiento completo."""
     print("Iniciando preprocesamiento desde archivos .txt...")
-    # Cargar y parsear los archivos .txt crudos
     raw_transcripts = load_raw_transcripts()
 
     if not raw_transcripts:
         print("No se encontraron transcripciones crudas para procesar. Abortando.")
         return
 
-    # Asegurar que el directorio de salida exista
     if not os.path.exists(PROCESSED_DIR):
         try:
             os.makedirs(PROCESSED_DIR)
             print(f"Directorio de salida creado: {PROCESSED_DIR}")
         except OSError as e:
-             print(f"Error CRÍTICO creando directorio de salida {PROCESSED_DIR}: {e}")
-             return  # No podemos continuar si no podemos guardar
+            print(f"Error CRÍTICO creando directorio de salida {PROCESSED_DIR}: {e}")
+            return
 
-    # Contadores para el resumen final
     processed_count = 0
     error_count = 0
 
-    # Procesar cada transcripción cargada
-    for i, transcript_item in enumerate(raw_transcripts):
-        transcript_id = transcript_item.get('id', f'desconocido_{i}')
-        print(f"Procesando transcripción {i+1}/{len(raw_transcripts)} (ID: {transcript_id})...")
+    # Procesamiento concurrente de cada transcripción
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_and_save_transcript, transcript, i)
+                   for i, transcript in enumerate(raw_transcripts)]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                if future.result():
+                    processed_count += 1
+                else:
+                    error_count += 1
+            except Exception as exc:
+                error_count += 1
+                print(f"Error inesperado: {exc}")
 
-        # Llamar a la función de procesamiento individual
-        processed_transcript_data = preprocess_single_transcript(transcript_item)
-
-        # Guardar el resultado si el procesamiento fue exitoso
-        if processed_transcript_data:
-            save_processed_transcript(processed_transcript_data)  # Guarda como JSON
-            processed_count += 1
-        else:
-            # Si preprocess_single_transcript devuelve None, contar como error
-            error_count += 1
-            print(f"  Error procesando transcripción ID: {transcript_id}. Omitida.")
-
-    # Imprimir resumen del proceso
     print(f"\n--- Preprocesamiento Completo ---")
     print(f"Transcripciones procesadas exitosamente: {processed_count}")
     if error_count > 0:
@@ -322,30 +304,37 @@ def test_presidio():
 
     for name, text in test_cases.items():
         print(f"\nCaso: {name}")
-        print(f"  Texto Original : '{text}'")
+        print(f"  Texto Original   : '{text}'")
         cleaned = clean_text(text)
-        print(f"  Texto Limpio   : '{cleaned}'")
+        print(f"  Texto Limpio     : '{cleaned}'")
         anonymized = anonymize_text(cleaned)
         print(f"  Texto Anonimizado: '{anonymized}'")
 
-        # Verificaciones básicas
         if name == "Sin PII" and anonymized != cleaned:
              print("  [!] ADVERTENCIA: ¡Texto sin PII fue modificado!")
         if name == "Con PII":
-            if anonymized == cleaned: print("  [!] ADVERTENCIA: ¡Texto con PII NO fue modificado!")
-            if "<PERSONA>" not in anonymized: print("  [!] ADVERTENCIA: ¡PERSONA no anonimizada!")
-            if "<RUT>" not in anonymized: print("  [!] ADVERTENCIA: ¡RUT no anonimizado!")
-            if "<TELEFONO>" not in anonymized: print("  [!] ADVERTENCIA: ¡TELEFONO no anonimizado!")  # Debería ser enmascarado
-            if "<EMAIL>" not in anonymized: print("  [!] ADVERTENCIA: ¡EMAIL no anonimizado!")  # Debería ser enmascarado
+            if anonymized == cleaned:
+                print("  [!] ADVERTENCIA: ¡Texto con PII NO fue modificado!")
+            if "<PERSONA>" not in anonymized:
+                print("  [!] ADVERTENCIA: ¡PERSONA no anonimizada!")
+            if "<RUT>" not in anonymized:
+                print("  [!] ADVERTENCIA: ¡RUT no anonimizado!")
+            if "<TELEFONO>" not in anonymized:
+                print("  [!] ADVERTENCIA: ¡TELEFONO no anonimizado!")
+            if "<EMAIL>" not in anonymized:
+                print("  [!] ADVERTENCIA: ¡EMAIL no anonimizado!")
         if name == "Con Markdown":
-             if anonymized == cleaned: print("  [!] ADVERTENCIA: ¡Texto (Markdown) con PII NO fue modificado!")
-             if "<PERSONA>" not in anonymized: print("  [!] ADVERTENCIA: ¡PERSONA (Markdown) no anonimizada!")
-             if "<RUT>" not in anonymized: print("  [!] ADVERTENCIA: ¡RUT (Markdown) no anonimizado!")
+             if anonymized == cleaned:
+                 print("  [!] ADVERTENCIA: ¡Texto (Markdown) con PII NO fue modificado!")
+             if "<PERSONA>" not in anonymized:
+                 print("  [!] ADVERTENCIA: ¡PERSONA (Markdown) no anonimizada!")
+             if "<RUT>" not in anonymized:
+                 print("  [!] ADVERTENCIA: ¡RUT (Markdown) no anonimizado!")
 
     print("\n--- Fin Prueba Presidio ---")
 
 # --- Punto de Entrada Principal ---
 if __name__ == "__main__":
     main()
-    # Descomenta la siguiente línea si quieres ejecutar las pruebas de Presidio al final
-    #test_presidio()
+    # Descomenta la siguiente línea si deseas ejecutar las pruebas de Presidio al final
+    # test_presidio()

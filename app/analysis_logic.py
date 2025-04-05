@@ -2,22 +2,21 @@
 import os
 import sys
 from typing import List, Optional
+import asyncio # Necesario si usamos await
 
-# Añadir el directorio raíz al path para importar desde 'app'
+# Añadir el directorio raíz al path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.openai_utils import get_chat_completion
+# >>> Importar la versión ASÍNCRONA <<<
+from app.openai_utils import get_chat_completion_async
 
-# --- Constantes ---
+# --- Constantes (sin cambios) ---
 CLASSIFICATION_CATEGORIES = [
-    "Problemas Técnicos",
-    "Soporte Comercial",  # Incluye facturación, planes
-    "Solicitudes Administrativas",  # Cambios de datos, etc.
-    "Consultas Generales",
-    "Reclamos"
+    "Problemas Técnicos", "Soporte Comercial", "Solicitudes Administrativas",
+    "Consultas Generales", "Reclamos"
 ]
 
-# --- Prompts ---
+# --- Prompts (sin cambios) ---
 TOPIC_EXTRACTION_PROMPT_TEMPLATE = """
 Analiza la siguiente transcripción de una llamada de atención al cliente.
 Extrae los 2 o 3 temas o problemas principales discutidos.
@@ -43,41 +42,47 @@ Transcripción:
 Categoría:
 """
 
-def extract_topics(text: str) -> List[str]:
-    """Extrae temas principales usando un LLM de OpenAI."""
+# >>> Convertir a ASYNC DEF <<<
+async def extract_topics(text: str) -> List[str]:
+    """Extrae temas principales usando un LLM de OpenAI (ASÍNCRONO)."""
     if not text:
         return []
-    print("Extrayendo temas...")
-    prompt = TOPIC_EXTRACTION_PROMPT_TEMPLATE.format(transcript_text=text[:4000])  # Limitar longitud para evitar exceder tokens
-    response = get_chat_completion(prompt, model="gpt-4o-mini", max_tokens=50, temperature=0.1)
+    print("(Async) Extrayendo temas...")
+    prompt = TOPIC_EXTRACTION_PROMPT_TEMPLATE.format(transcript_text=text[:4000])
+    # >>> USAR AWAIT y la función ASYNC <<<
+    response = await get_chat_completion_async(prompt, model="gpt-4o-mini", max_tokens=50, temperature=0.1)
 
     if response:
         topics = [topic.strip() for topic in response.split(',') if topic.strip()]
-        print(f"Temas extraídos: {topics}")
+        print(f"(Async) Temas extraídos: {topics}")
         return topics
     else:
-        print("Error al extraer temas.")
+        print("(Async) Error al extraer temas.")
         return []
 
-def classify_transcript(text: str) -> Optional[str]:
-    """Clasifica la transcripción usando un LLM de OpenAI."""
+# >>> Convertir a ASYNC DEF <<<
+async def classify_transcript(text: str) -> Optional[str]:
+    """Clasifica la transcripción usando un LLM de OpenAI (ASÍNCRONO)."""
     if not text:
         return None
-    print("Clasificando transcripción...")
+    print("(Async) Clasificando transcripción...")
     categories_str = ", ".join(CLASSIFICATION_CATEGORIES)
     prompt = CLASSIFICATION_PROMPT_TEMPLATE.format(
         categories=categories_str,
-        transcript_text=text[:4000]  # Limitar longitud
+        transcript_text=text[:4000]
     )
-    response = get_chat_completion(prompt, model="gpt-4o-mini", max_tokens=20, temperature=0.0)  # Temperatura 0 para máxima consistencia
+    # >>> USAR AWAIT y la función ASYNC <<<
+    response = await get_chat_completion_async(prompt, model="gpt-4o-mini", max_tokens=20, temperature=0.0)
 
     if response:
+        # La validación de la respuesta sigue igual
         if response in CLASSIFICATION_CATEGORIES:
-            print(f"Categoría clasificada: {response}")
+            print(f"(Async) Categoría clasificada: {response}")
             return response
         else:
-            print(f"Advertencia: Respuesta de clasificación no coincide con categorías esperadas ('{response}'). Devolviendo respuesta cruda.")
-            return response
+            print(f"(Async) Advertencia: Respuesta de clasificación no coincide ('{response}').")
+            # Decidir si devolver la respuesta cruda o None en caso de no coincidencia
+            return response # Devolver respuesta cruda por ahora
     else:
-        print("Error al clasificar.")
+        print("(Async) Error al clasificar.")
         return None
