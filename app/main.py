@@ -131,8 +131,10 @@ def get_text_for_analysis(request: AnalysisRequest) -> str:
             )
 
             if not result:
-                raise HTTPException(status_code=404, detail=f"ID '{transcript_id_to_find}' no encontrado.")
-
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Transcripción con ID '{transcript_id_to_find}' no encontrada. Verifica que el ID sea correcto."
+                )
             payload = result[0].payload or {}
             text = payload.get("full_text")
             if text is None:

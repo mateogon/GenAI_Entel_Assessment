@@ -52,7 +52,11 @@ def search_api(query: str, search_type: str = "semantic", top_n: int = 5):
         st.error(f"Error: No se pudo conectar a la API en {API_BASE_URL}. Verifica que el backend esté ejecutándose.")
         return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Error en la llamada a la API de búsqueda ({url}): {e}")
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+            st.error(f"Error: {error_detail}")
+        except Exception:
+            st.error(f"Error en la llamada a la API de análisis ({url}): {e.response}")
         return None
     except Exception as e:
         st.error(f"Error inesperado durante la búsqueda: {e}")
@@ -91,7 +95,11 @@ def analyze_api(endpoint: str, transcript_id: str = None, text: str = None):
         st.error(f"Error: No se pudo conectar a la API en {API_BASE_URL}. Verifica que el backend esté ejecutándose.")
         return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Error en la llamada a la API de análisis ({url}): {e}")
+        try:
+            error_detail = e.response.json().get("detail", str(e))
+            st.error(f"Error: {error_detail}")
+        except Exception:
+            st.error(f"Error en la llamada a la API de análisis ({url}): {e.response}")
         return None
     except Exception as e:
         st.error(f"Error inesperado durante el análisis ({endpoint}): {e}")
