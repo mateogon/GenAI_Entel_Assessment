@@ -24,7 +24,14 @@ Se ha desarrollado priorizando la escalabilidad (uso de Qdrant y asyncio), efici
   - Uso de modelos eficientes (`text-embedding-3-small` y `gpt-4o-mini`).
   - Modo de simulación controlable (configurable vía `ENABLE_OPENAI_CALLS` en el archivo `.env`) para desarrollo y pruebas sin consumir créditos de OpenAI.
 - **Preprocesamiento:** Limpieza de texto, manejo de transcripciones en formato `.txt` y anonimización de PII (incluyendo RUT chileno) con Presidio.
-- **Interfaz Opcional:** Frontend básico desarrollado con Streamlit para interactuar con la API.
+- **Interfaz:** Frontend básico desarrollado con Streamlit para interactuar con la API.
+
+## Interfaz
+
+A continuación se muestra una vista previa del frontend:
+
+![Frontend Demo](assets/demo.png)
+
 
 ## ⚙️ Configuración del Entorno
 
@@ -85,9 +92,9 @@ Sigue estos pasos para configurar el proyecto localmente (probado en Windows con
 ### Iniciar Qdrant (Base de Datos Vectorial)
 Abre una terminal y ejecuta:
 ```bash
-docker run -d --name qdrant_db -p 6333:6333 -p 6334:6334 qdrant/qdrant
+docker run -d --name qdrant_db -p 6333:6333 qdrant/qdrant
 ```
-El puerto `6333` es para la API y `6334` para la UI web opcional ([http://localhost:6334/dashboard](http://localhost:6334/dashboard)).
+El puerto `6333` es para la API y para la UI web ([http://localhost:6333/dashboard](http://localhost:6333/dashboard)).
 
 ### Preparar Datos y Generar Embeddings  
 *(Ejecutar solo una vez inicialmente o si los datos cambian)*
@@ -180,13 +187,3 @@ La documentación interactiva se genera automáticamente cuando el backend está
   "collection_points_count": 100
 }
 ```
-
-## 💡 Posibles Mejoras Futuras
-
-- Implementar caché (ej: Redis) para respuestas de análisis de OpenAI.
-- Optimizar la configuración de Qdrant (índices HNSW, cuantización) para datasets más grandes.
-- Añadir paralelismo (usando `concurrent.futures` o `asyncio.gather`) al script de generación de embeddings para acelerar la ingesta en máquinas multi-núcleo.
-- Explorar modelos open-source (Sentence Transformers, modelos de Hugging Face) como alternativa a OpenAI para reducir costos a largo plazo.
-- Mejorar el logging y añadir monitorización (ej: Prometheus, Grafana).
-- Implementar pruebas automatizadas (pytest).
-- Refinar la interfaz de usuario del frontend.
