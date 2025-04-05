@@ -1,17 +1,20 @@
+"""
+Propósito: Preprocesar transcripciones .txt aplicando limpieza y anonimización de información sensible.
+Utiliza Presidio para detectar y reemplazar PII, y ejecuta el procesamiento de forma concurrente.
+"""
+
 import re
 import os
 import sys
 import concurrent.futures
 from typing import List, Dict, Any, Optional
 
-# --- Añadir Directorio Raíz al Path ---
-# Determinar el directorio base del proyecto (un nivel arriba de 'scripts')
+# Se ajusta el path para acceder a los módulos del proyecto
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.append(BASE_DIR)
 
-# --- Importaciones ---
-# Importar Presidio y nuestras funciones DESPUÉS de ajustar el path
+# Intentar importar Presidio; si falla, se definen clases dummy para evitar errores
 try:
     from presidio_analyzer import AnalyzerEngine, PatternRecognizer, RecognizerRegistry, Pattern
     from presidio_anonymizer import AnonymizerEngine
@@ -20,9 +23,8 @@ try:
     PRESIDIO_INSTALLED = True
 except ImportError:
     print("ADVERTENCIA: Librerías Presidio no encontradas. La anonimización será omitida.")
-    print("Por favor, instala: pip install presidio-analyzer presidio-anonymizer")
+    print("Instala: pip install presidio-analyzer presidio-anonymizer")
     PRESIDIO_INSTALLED = False
-    # Definir clases dummy para que el resto del código no falle si no está instalado
     class AnalyzerEngine: pass
     class AnonymizerEngine: pass
     class OperatorConfig: pass
@@ -32,7 +34,7 @@ except ImportError:
 
 from scripts.load_data import load_raw_transcripts, save_processed_transcript, PROCESSED_DIR
 
-# --- Configuración Presidio (Global para eficiencia) ---
+# --- Configuración global para Presidio ---
 analyzer = None
 anonymizer = None
 PRESIDIO_AVAILABLE = False
@@ -40,69 +42,58 @@ PRESIDIO_AVAILABLE = False
 if PRESIDIO_INSTALLED:
     try:
         print("Inicializando Presidio Analyzer y Anonymizer...")
-
-        # 1. Inicializar el NLP engine para español usando spaCy
+        # Inicializa el motor NLP para español con spaCy
         nlp_provider = NlpEngineProvider(nlp_configuration={
             "nlp_engine_name": "spacy",
             "models": [{"lang_code": "es", "model_name": "es_core_news_md"}]
         })
         nlp_engine = nlp_provider.create_engine()
 
-        # 2. Inicializar AnalyzerEngine con el NLP engine y soporte para "es"
+        # Configura AnalyzerEngine para el idioma español
         analyzer = AnalyzerEngine(nlp_engine=nlp_engine, supported_languages=["es"])
-
-        # 3. Cargar los reconocedores predefinidos para español (incluye PERSON, LOCATION, etc.)
         analyzer.registry.load_predefined_recognizers(languages=["es"], nlp_engine=nlp_engine)
         print("Recognizers predeterminados para 'es' cargados.")
 
-        # --- Reconocedor de RUT ---
-        # Definir el patrón para RUT Chileno
+        # Definición y registro de patrones personalizados para RUT y números telefónicos
         rut_pattern_standard = Pattern(
             name="rut_pattern",
             regex=r"\b(\d{1,2}\.\d{3}\.\d{3}-[\dkK])\b",
-            score=0.8  # Puntuación alta por ser un patrón específico
+            score=0.8
         )
-        # Nuevo patrón para formato con guiones
         rut_pattern_dashes = Pattern(
             name="rut_pattern_dashes",
             regex=r"\b(\d{1,2}-\d{3}-\d{3}-[\dkK]?)\b",
-            score=0.75  # Puntuación ligeramente menor para diferenciar
+            score=0.75
         )
         rut_pattern_spaces = Pattern(
             name="rut_pattern_spaces",
-            regex=r"\b(\d{1,2}\s\d{3}\s\d{3}-[\dkK])\b",  # Ejemplo: 12 345 678-9
-            score=0.75  # Puntuación ligeramente menor para diferenciar
-        )   
-        # --- Reconocedor de Números Telefónicos (formato chileno) ---
+            regex=r"\b(\d{1,2}\s\d{3}\s\d{3}-[\dkK])\b",
+            score=0.75
+        )
         phone_pattern = Pattern(
             name="chile_phone_pattern",
-            # Coincide con +56XXXXXXXXX, +56 9 XXXX XXXX y otros formatos comunes chilenos
             regex=r"\b(\+?56\s?[2-9][\s\d]{8,11})\b",
-            score=0.7  # Puntuación adecuada para asegurar detección
+            score=0.7
         )
         phone_recognizer = PatternRecognizer(
-            supported_entity="PHONE_NUMBER",  # Tipo de entidad estándar para compatibilidad
+            supported_entity="PHONE_NUMBER",
             name="ChileanPhoneRecognizer",
             patterns=[phone_pattern],
             context=["teléfono", "fono", "celular", "móvil", "llamar", "contacto"],
             supported_language="es"
         )
-
-        # --- Reconocedor de Email (mejorado) ---
         email_pattern = Pattern(
             name="email_pattern",
             regex=r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-            score=0.9  # Puntuación más alta para priorizar la detección
+            score=0.9
         )
         email_recognizer = PatternRecognizer(
-            supported_entity="EMAIL_ADDRESS",  # Tipo de entidad estándar para compatibilidad
+            supported_entity="EMAIL_ADDRESS",
             name="EmailRecognizer",
             patterns=[email_pattern],
             context=["email", "correo", "e-mail", "@"],
             supported_language="es"
         )
-
-        # Crear el reconocedor de RUT usando los patrones
         rut_recognizer = PatternRecognizer(
             supported_entity="CL_RUT",
             name="ChileanRUTRecognizer",
@@ -110,13 +101,11 @@ if PRESIDIO_INSTALLED:
             context=["RUT", "rut", "Rol Único Tributario"],
             supported_language="es"
         )
-
-        # Añadir todos los reconocedores personalizados al registro
         analyzer.registry.add_recognizer(rut_recognizer)
         analyzer.registry.add_recognizer(phone_recognizer)
         analyzer.registry.add_recognizer(email_recognizer)
 
-        # 4. Inicializar AnonymizerEngine
+        # Inicializa el motor de anonimización
         anonymizer = AnonymizerEngine()
 
         print("Presidio inicializado correctamente con reconocedor de RUT.")
@@ -130,32 +119,33 @@ if PRESIDIO_INSTALLED:
 else:
     print("Presidio no está instalado. La anonimización será omitida.")
 
-# --- Regex para Limpieza ---
+# --- Expresiones regulares para limpieza de texto ---
 FILLER_WORDS_ES = re.compile(
     r'\b(eh|este|pues|bueno|o sea|¿sabes\?|¿no\?|¿vale\?|¿entiendes\?|um|uh|hmm|como)\b',
     re.IGNORECASE
 )
 MULTIPLE_SPACES = re.compile(r'\s{2,}')
 LEADING_TRAILING_SPACES = re.compile(r'^\s+|\s+$')
-MARKDOWN_BOLD = re.compile(r'\*\*(.*?)\*\*')  # Regex para quitar ** de markdown
+MARKDOWN_BOLD = re.compile(r'\*\*(.*?)\*\*')  # Elimina formato bold de Markdown
 
-# --- Funciones de Procesamiento ---
 def clean_text(text: str) -> str:
-    """Realiza limpieza básica del texto, incluyendo markdown simple."""
+    """
+    Limpia el texto eliminando markdown, espacios redundantes y palabras de relleno.
+    """
     if not isinstance(text, str):
         return ""
-    # Quitar markdown bold (**texto**) -> texto
     cleaned = MARKDOWN_BOLD.sub(r'\1', text)
-    # Limpieza general
     cleaned = LEADING_TRAILING_SPACES.sub('', cleaned)
     cleaned = FILLER_WORDS_ES.sub('', cleaned)
     cleaned = MULTIPLE_SPACES.sub(' ', cleaned)
     return cleaned.strip()
 
 def anonymize_text(text: str) -> str:
-    """Detecta y anonimiza PII usando Presidio, si está disponible."""
+    """
+    Si Presidio está disponible, detecta y reemplaza información sensible (PII) en el texto.
+    En caso contrario, devuelve el texto limpio original.
+    """
     if not PRESIDIO_AVAILABLE or not analyzer or not anonymizer or not isinstance(text, str) or not text.strip():
-        # Si Presidio no está disponible o texto inválido, devolver texto original (ya limpio)
         return text
 
     try:
@@ -168,7 +158,6 @@ def anonymize_text(text: str) -> str:
             ],
             allow_list=None,
         )
-
         if not analyzer_results:
             return text
 
@@ -202,13 +191,17 @@ def anonymize_text(text: str) -> str:
         return text
 
 def preprocess_single_transcript(transcript_item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Limpia y anonimiza el texto dentro de cada turno de la transcripción parseada."""
+    """
+    Procesa una transcripción individual:
+      - Limpia y anonimiza cada turno de diálogo (si aplica).
+      - Omite turnos del sistema o sin contenido relevante.
+    """
     processed_utterances = []
     transcript_id = transcript_item.get("id", "ID_DESCONOCIDO")
     original_utterances = transcript_item.get('data', [])
 
     if not isinstance(original_utterances, list):
-         print(f"Advertencia: Formato de datos parseados inválido para ID {transcript_id}. Se esperaba lista. Saltando transcripción.")
+         print(f"Advertencia: Datos en formato inesperado para ID {transcript_id}. Se esperaba una lista.")
          return None
 
     for utterance in original_utterances:
@@ -218,6 +211,7 @@ def preprocess_single_transcript(transcript_item: Dict[str, Any]) -> Optional[Di
 
         original_preview = original_text[:70] + ("..." if len(original_text) > 70 else "")
 
+        # Se omiten textos de turnos del sistema, notas o sin contenido
         if speaker in ["SISTEMA", "NOTA", "DESCONOCIDO"] or not original_text.strip():
              processed_text = ""
         else:
@@ -234,8 +228,12 @@ def preprocess_single_transcript(transcript_item: Dict[str, Any]) -> Optional[Di
 
     return {"id": transcript_id, "processed_data": processed_utterances}
 
-# --- Función para Procesar y Guardar cada Transcripción ---
 def process_and_save_transcript(transcript_item: Dict[str, Any], index: int) -> bool:
+    """
+    Procesa y guarda una transcripción. Se utiliza en procesamiento concurrente.
+    
+    Retorna True si el procesamiento y guardado fueron exitosos, de lo contrario False.
+    """
     transcript_id = transcript_item.get("id", f"desconocido_{index}")
     print(f"Procesando transcripción {index+1} (ID: {transcript_id})...")
     processed_transcript_data = preprocess_single_transcript(transcript_item)
@@ -243,11 +241,16 @@ def process_and_save_transcript(transcript_item: Dict[str, Any], index: int) -> 
         save_processed_transcript(processed_transcript_data)
         return True
     else:
-        print(f"Error procesando transcripción ID: {transcript_id}. Omitida.")
+        print(f"Error procesando transcripción ID: {transcript_id}. Se omite.")
         return False
 
-# --- Función Principal ---
 def main():
+    """
+    Función principal para:
+      1. Cargar las transcripciones crudas.
+      2. Procesarlas (limpieza y anonimización) de forma concurrente.
+      3. Guardar cada transcripción procesada en formato JSON.
+    """
     print("Iniciando preprocesamiento desde archivos .txt...")
     raw_transcripts = load_raw_transcripts()
 
@@ -266,7 +269,7 @@ def main():
     processed_count = 0
     error_count = 0
 
-    # Procesamiento concurrente de cada transcripción
+    # Se utiliza ThreadPoolExecutor para procesar transcripciones en paralelo
     with concurrent.futures.ThreadPoolExecutor() as executor:
         futures = [executor.submit(process_and_save_transcript, transcript, i)
                    for i, transcript in enumerate(raw_transcripts)]
@@ -283,14 +286,16 @@ def main():
     print(f"\n--- Preprocesamiento Completo ---")
     print(f"Transcripciones procesadas exitosamente: {processed_count}")
     if error_count > 0:
-        print(f"Transcripciones con errores o formato inválido (omitidas): {error_count}")
+        print(f"Transcripciones omitidas o con errores: {error_count}")
     print(f"Archivos procesados guardados como JSON en: {PROCESSED_DIR}")
 
-# --- Bloque de Prueba Opcional para Presidio ---
 def test_presidio():
-    """Realiza una prueba básica de Presidio para verificar la anonimización."""
+    """
+    Ejecuta casos de prueba para verificar la funcionalidad de Presidio.
+    Se evalúa la anonimización de diferentes escenarios.
+    """
     if not PRESIDIO_AVAILABLE:
-        print("\nPresidio no está disponible. Omitiendo prueba.")
+        print("\nPresidio no está disponible. Se omite la prueba.")
         return
 
     print("\n--- Probando Presidio ---")
@@ -311,30 +316,29 @@ def test_presidio():
         print(f"  Texto Anonimizado: '{anonymized}'")
 
         if name == "Sin PII" and anonymized != cleaned:
-             print("  [!] ADVERTENCIA: ¡Texto sin PII fue modificado!")
+             print("  [!] ADVERTENCIA: ¡El texto sin PII fue modificado!")
         if name == "Con PII":
             if anonymized == cleaned:
-                print("  [!] ADVERTENCIA: ¡Texto con PII NO fue modificado!")
+                print("  [!] ADVERTENCIA: ¡El texto con PII no fue anonimizado!")
             if "<PERSONA>" not in anonymized:
-                print("  [!] ADVERTENCIA: ¡PERSONA no anonimizada!")
+                print("  [!] ADVERTENCIA: ¡Falta anonimizar 'PERSONA'!")
             if "<RUT>" not in anonymized:
-                print("  [!] ADVERTENCIA: ¡RUT no anonimizado!")
+                print("  [!] ADVERTENCIA: ¡Falta anonimizar 'RUT'!")
             if "<TELEFONO>" not in anonymized:
-                print("  [!] ADVERTENCIA: ¡TELEFONO no anonimizado!")
+                print("  [!] ADVERTENCIA: ¡Falta anonimizar 'TELEFONO'!")
             if "<EMAIL>" not in anonymized:
-                print("  [!] ADVERTENCIA: ¡EMAIL no anonimizado!")
+                print("  [!] ADVERTENCIA: ¡Falta anonimizar 'EMAIL'!")
         if name == "Con Markdown":
              if anonymized == cleaned:
-                 print("  [!] ADVERTENCIA: ¡Texto (Markdown) con PII NO fue modificado!")
+                 print("  [!] ADVERTENCIA: ¡El texto con Markdown no fue anonimizado!")
              if "<PERSONA>" not in anonymized:
-                 print("  [!] ADVERTENCIA: ¡PERSONA (Markdown) no anonimizada!")
+                 print("  [!] ADVERTENCIA: ¡Falta anonimizar 'PERSONA' en Markdown!")
              if "<RUT>" not in anonymized:
-                 print("  [!] ADVERTENCIA: ¡RUT (Markdown) no anonimizado!")
+                 print("  [!] ADVERTENCIA: ¡Falta anonimizar 'RUT' en Markdown!")
 
     print("\n--- Fin Prueba Presidio ---")
 
-# --- Punto de Entrada Principal ---
 if __name__ == "__main__":
     main()
-    # Descomenta la siguiente línea si deseas ejecutar las pruebas de Presidio al final
+    # Descomenta la siguiente línea para ejecutar la prueba de Presidio
     # test_presidio()

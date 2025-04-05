@@ -1,32 +1,32 @@
-# Assessment AI Engineer - Análisis Semántico de Transcripciones (Entel GenAI)
+# 🤖 Assessment AI Engineer - Análisis Semántico de Transcripciones (Entel GenAI)
 
 Este repositorio contiene la solución para el assessment de AI Engineer del equipo GenAI de Entel. El proyecto implementa un sistema backend escalable para analizar semánticamente transcripciones de llamadas de atención al cliente, utilizando la API de OpenAI de forma optimizada y la base de datos vectorial Qdrant.
 
-## Descripción General
+## 📝 Descripción General
 
 El sistema permite:
 
-- **Búsqueda**: Encontrar transcripciones relevantes mediante palabras clave o significado semántico, consultando eficientemente la base de datos vectorial Qdrant.
-- **Extracción de Temas**: Identificar los temas principales discutidos en una conversación, usando llamadas asíncronas a OpenAI para no bloquear la API.
-- **Clasificación Automática**: Asignar categorías predefinidas (ej: "Problemas Técnicos", "Soporte Comercial") a las llamadas, usando llamadas asíncronas a OpenAI.
+- **🔍 Búsqueda:** Encontrar transcripciones relevantes mediante palabras clave o significado semántico, consultando eficientemente la base de datos vectorial Qdrant.
+- **📊 Extracción de Temas:** Identificar los temas principales discutidos en una conversación, usando llamadas asíncronas a OpenAI para no bloquear la API.
+- **🏷️ Clasificación Automática:** Asignar categorías predefinidas (ej: "Problemas Técnicos", "Soporte Comercial") a las llamadas, mediante llamadas asíncronas a OpenAI.
 
-Se ha desarrollado priorizando la escalabilidad (uso de Qdrant, asyncio), eficiencia (procesamiento batch de embeddings) y una gestión cuidadosa del presupuesto de OpenAI ($5 USD).
+Se ha desarrollado priorizando la escalabilidad (uso de Qdrant y asyncio), eficiencia (procesamiento batch de embeddings) y una gestión cuidadosa del presupuesto de OpenAI ($5 USD).
 
-## Características Principales
+## ✨ Características Principales
 
-- **Backend API**: Construido con FastAPI, proporcionando endpoints RESTful para búsqueda y análisis. Operaciones asíncronas para un análisis no bloqueante.
-- **Base de Datos Vectorial**: Utiliza Qdrant (ejecutado vía Docker) para almacenar embeddings y texto, permitiendo búsquedas semánticas y por palabra clave rápidas y escalables.
-- **Procesamiento NLP**:
-  - Se usa `text-embedding-3-small` de OpenAI para búsqueda semántica. Los embeddings se generan en lotes y se almacenan en Qdrant.
-  - Se utiliza `gpt-4o-mini` de OpenAI para la extracción de temas y clasificación mediante llamadas asíncronas.
-- **Optimización de Costos**:
+- **Backend API:** Construido con FastAPI, proporcionando endpoints RESTful para búsqueda y análisis. Operaciones asíncronas para un análisis no bloqueante.
+- **Base de Datos Vectorial:** Utiliza Qdrant (ejecutado vía Docker) para almacenar embeddings y texto, permitiendo búsquedas semánticas y por palabra clave rápidas y escalables.
+- **Procesamiento NLP:**
+  - Se utiliza `text-embedding-3-small` de OpenAI para búsqueda semántica. Los embeddings se generan en lotes y se almacenan en Qdrant.
+  - Se emplea `gpt-4o-mini` de OpenAI para la extracción de temas y clasificación mediante llamadas asíncronas.
+- **Optimización de Costos:**
   - Generación batch de embeddings para minimizar las llamadas a la API.
   - Uso de modelos eficientes (`text-embedding-3-small` y `gpt-4o-mini`).
   - Modo de simulación controlable (configurable vía `ENABLE_OPENAI_CALLS` en el archivo `.env`) para desarrollo y pruebas sin consumir créditos de OpenAI.
-- **Preprocesamiento**: Limpieza de texto, manejo de transcripciones en formato `.txt` y anonimización de PII (incluyendo RUT chileno) con Presidio.
-- **Interfaz Opcional**: Frontend básico desarrollado con Streamlit para interactuar con la API.
+- **Preprocesamiento:** Limpieza de texto, manejo de transcripciones en formato `.txt` y anonimización de PII (incluyendo RUT chileno) con Presidio.
+- **Interfaz Opcional:** Frontend básico desarrollado con Streamlit para interactuar con la API.
 
-## Configuración del Entorno
+## ⚙️ Configuración del Entorno
 
 Sigue estos pasos para configurar el proyecto localmente (probado en Windows con PowerShell, adaptable a Linux/Mac):
 
@@ -54,7 +54,7 @@ Sigue estos pasos para configurar el proyecto localmente (probado en Windows con
    ```
    Esto instalará FastAPI, Uvicorn, Streamlit, OpenAI, Qdrant client, Presidio, spaCy, etc.
 
-5. **Descargar el Modelo de Lenguaje spaCy** (necesario para Presidio)
+5. **Descargar el Modelo de Lenguaje spaCy** *(necesario para Presidio)*
    ```bash
    python -m spacy download es_core_news_md
    ```
@@ -80,14 +80,14 @@ Sigue estos pasos para configurar el proyecto localmente (probado en Windows con
 8. **Colocar Datos Crudos**  
    Asegúrate de que las 100 transcripciones en formato `.txt` (ej: `sample_01.txt`) estén dentro de la carpeta `data/raw/`.
 
-## Ejecución
+## 🚀 Ejecución
 
 ### Iniciar Qdrant (Base de Datos Vectorial)
 Abre una terminal y ejecuta:
 ```bash
-docker run -d --name qdrant_db -p 6333:6333 qdrant/qdrant
+docker run -d --name qdrant_db -p 6333:6333 -p 6334:6334 qdrant/qdrant
 ```
-El puerto `6333` es para la API y para la UI web ([http://localhost:6333/dashboard](http://localhost:6333/dashboard)).
+El puerto `6333` es para la API y `6334` para la UI web opcional ([http://localhost:6334/dashboard](http://localhost:6334/dashboard)).
 
 ### Preparar Datos y Generar Embeddings  
 *(Ejecutar solo una vez inicialmente o si los datos cambian)*
@@ -99,7 +99,7 @@ El puerto `6333` es para la API y para la UI web ([http://localhost:6333/dashboa
    Este script lee los archivos `.txt` de `data/raw/`, los limpia/anonimiza y guarda archivos `.json` en `data/processed/`.
 
 2. **Generación de Embeddings e Indexación en Qdrant**  
-   *(Asegúrate que `ENABLE_OPENAI_CALLS=true` en `.env` si es la primera vez o si necesitas regenerar embeddings)*
+   *(Asegúrate de que `ENABLE_OPENAI_CALLS=true` en `.env` si es la primera vez o si necesitas regenerar embeddings)*
    ```bash
    python scripts/generate_embeddings_openai.py
    ```
@@ -138,13 +138,13 @@ streamlit run frontend.py
 ```
 Se abrirá automáticamente una pestaña en tu navegador (usualmente en [http://localhost:8501](http://localhost:8501)).
 
-## Arquitectura y Decisiones Técnicas
+## ⚙️ Arquitectura y Decisiones Técnicas
 
 - **Backend:** FastAPI por su rendimiento, soporte nativo para `asyncio` y auto-documentación.
 - **Procesamiento de Texto Crudo:** Scripts en Python que utilizan expresiones regulares y Presidio para el parseo y la anonimización.
 - **Almacenamiento y Búsqueda:** Qdrant se emplea como base de datos vectorial. Almacena los embeddings y el texto completo anonimizado, permitiendo búsquedas semánticas y por palabra clave sin necesidad de cargar todos los datos en RAM.
 - **Análisis (Temas/Clasificación):** Uso de `gpt-4o-mini` de OpenAI a través de AsyncOpenAI para extraer temas y clasificar transcripciones.
-- **Generación de Embeddings:** Optimizada mediante llamadas batch a la API de OpenAI (`get_embeddings_batch`), lo que reduce la latencia y la cantidad de llamadas.
+- **Generación de Embeddings:** Optimizada mediante llamadas batch a la API de OpenAI (`get_embeddings_batch`), reduciendo la latencia y la cantidad de llamadas.
 - **Gestión de Presupuesto:** Uso de modelos eficientes, batching y modo de simulación (`ENABLE_OPENAI_CALLS`) para controlar el gasto.
 - **Escalabilidad:**
   - **Datos:** Qdrant permite escalar el almacenamiento de datos vectoriales y textuales más allá de la memoria RAM.
@@ -153,7 +153,7 @@ Se abrirá automáticamente una pestaña en tu navegador (usualmente en [http://
 - **Despliegue:** Se recomienda el uso de Gunicorn (Linux/Docker) o Waitress con múltiples instancias detrás de un balanceador de carga para aprovechar múltiples núcleos o máquinas.
 - **Frontend:** Streamlit permite crear prototipos de UI de forma rápida y sencilla.
 
-## Documentación de la API
+## 📖 Documentación de la API
 
 La documentación interactiva se genera automáticamente cuando el backend está en ejecución.
 
@@ -181,7 +181,7 @@ La documentación interactiva se genera automáticamente cuando el backend está
 }
 ```
 
-## Posibles Mejoras Futuras
+## 💡 Posibles Mejoras Futuras
 
 - Implementar caché (ej: Redis) para respuestas de análisis de OpenAI.
 - Optimizar la configuración de Qdrant (índices HNSW, cuantización) para datasets más grandes.
