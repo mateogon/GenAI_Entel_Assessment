@@ -35,9 +35,9 @@ Esta documentación describe los endpoints disponibles en la API backend, incluy
     ```json
     {
       "results": [
-        {"transcript_id": "sample_042", "score": 0.8134},
-        {"transcript_id": "sample_088", "score": 0.7950},
-        {"transcript_id": "sample_005", "score": 0.7712}
+        {"transcript_id": "sample_42", "score": 0.8134},
+        {"transcript_id": "sample_88", "score": 0.7950},
+        {"transcript_id": "sample_05", "score": 0.7712}
       ]
     }
     ```
@@ -46,8 +46,8 @@ Esta documentación describe los endpoints disponibles en la API backend, incluy
     ```json
     {
       "results": [
-        {"transcript_id": "sample_015", "score": null},
-        {"transcript_id": "sample_063", "score": null}
+        {"transcript_id": "sample_15", "score": null},
+        {"transcript_id": "sample_63", "score": null}
       ]
     }
     ```
@@ -61,7 +61,7 @@ Esta documentación describe los endpoints disponibles en la API backend, incluy
 *   **Request Body (JSON):** Proporcionar *uno* de los siguientes:
     ```json
     // Opción 1: Por ID
-    {"transcript_id": "sample_007"}
+    {"transcript_id": "sample_07"}
 
     // Opción 2: Por Texto Directo
     {"text": "El cliente llamó indicando que su servicio de internet no funciona desde ayer, probó reiniciando el router sin éxito."}
@@ -82,7 +82,7 @@ Esta documentación describe los endpoints disponibles en la API backend, incluy
 *   **Request Body (JSON):** Proporcionar *uno* de los siguientes:
     ```json
     // Opción 1: Por ID
-    {"transcript_id": "sample_021"}
+    {"transcript_id": "sample_21"}
 
     // Opción 2: Por Texto Directo
     {"text": "Buenas tardes, necesito hacer un reclamo por un cobro que no reconozco en mi boleta."}
