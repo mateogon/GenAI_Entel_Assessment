@@ -162,28 +162,11 @@ Se abrirá automáticamente una pestaña en tu navegador (usualmente en [http://
 
 ## 📖 Documentación de la API
 
-La documentación interactiva se genera automáticamente cuando el backend está en ejecución.
+La API backend, construida con FastAPI, expone endpoints RESTful para realizar búsquedas y análisis sobre las transcripciones.
 
-### Endpoints Principales
+*   **Documentación Interactiva (Auto-generada):** La forma más completa y actualizada para explorar los endpoints, ver los esquemas de datos exactos y probar la API directamente desde el navegador está disponible cuando el backend está en ejecución:
+    *   Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
+    *   ReDoc: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-- **POST /search/**  
-  Realiza búsquedas semánticas y por palabra clave.
-
-- **POST /analyze/topics/**  
-  Extrae temas de una transcripción. Acepta `transcript_id` o `text`.
-
-- **POST /analyze/classify/**  
-  Clasifica la transcripción. Acepta `transcript_id` o `text`.
-
-- **GET /status**  
-  Verifica el estado de la API y la conexión/puntos en Qdrant.
-
-#### Ejemplo de Respuesta (Éxito)
-```json
-{
-  "status": "ok",
-  "qdrant_status": "conectado",
-  "qdrant_collection": "transcripts_prod",
-  "collection_points_count": 100
-}
-```
+*   **Documentación Detallada y Ejemplos:** Para una descripción más detallada de cada endpoint, explicaciones de casos de uso, ejemplos prácticos con `curl`, y ejemplos de respuestas JSON, por favor consulta el documento dedicado:
+    *   **➡️ [Ver Documentación Detallada de la API (API_DOCUMENTATION.md)](API_DOCUMENTATION.md)**
